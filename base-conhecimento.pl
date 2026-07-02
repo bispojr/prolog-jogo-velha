@@ -28,6 +28,7 @@ inicializar :-
 proximo(x, o).
 proximo(o, x).
 
+
 % ---------------------------------
 % JOGAR
 % ---------------------------------
@@ -74,3 +75,20 @@ venceu(J) :-
     casa(B, J),
     casa(C, J),
     J \= v.
+
+% ---------------------------------
+% BOT BOBINHO
+% ---------------------------------
+posicao_vazia(Pos) :-
+    casa(Pos, v).
+
+bot_bobinho :-
+    posicao_vazia(1), jogar(1);
+    posicao_vazia(2), jogar(2);
+    posicao_vazia(3), jogar(3);
+    posicao_vazia(4), jogar(4);
+    posicao_vazia(5), jogar(5);
+    posicao_vazia(6), jogar(6);
+    posicao_vazia(7), jogar(7);
+    posicao_vazia(8), jogar(8);
+    posicao_vazia(9), jogar(9).
