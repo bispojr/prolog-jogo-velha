@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="pt-br">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,44 +9,7 @@
 
     <script src="https://cdn.jsdelivr.net/npm/tau-prolog/modules/core.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tau-prolog/modules/lists.min.js"></script>
-
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-        }
-
-        h1 {
-            text-align: center;
-            color: #333;
-        }
-
-        .container {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 80vh;
-        }
-
-        table {
-            width: 300px;
-            height: 300px;
-            table-layout: fixed;
-            border-collapse: collapse;
-        }
-
-        td {
-            width: 100px;
-            height: 100px;
-            background: lightgreen;
-            border: 4px solid white; 
-            text-align: center;
-            vertical-align: middle;
-            font-size: 3em;
-            font-weight: bold;
-            cursor: pointer;
-            user-select: none;
-        }
-    </style>
+    <link rel="stylesheet" href="styles.css">
 </head>
 
 <body>
@@ -55,34 +19,123 @@
 <div class="container">
     <table>
         <tr>
-            <td></td>
-            <td></td>
-            <td></td>
+            <td></td><td></td><td></td>
         </tr>
         <tr>
-            <td></td>
-            <td></td>
-            <td></td>
+            <td></td><td></td><td></td>
         </tr>
         <tr>
-            <td></td>
-            <td></td>
-            <td></td>
+            <td></td><td></td><td></td>
         </tr>
     </table>
 </div>
 
-<script>
-    const estados = ["", "X", "O"];
+<div class="prolog-console">
+    <input
+        id="consulta"
+        type="text"
+        placeholder="Ex.: pai(X,Y)."
+    >
+    <button id="executar">Executar</button>
+</div>
 
-    document.querySelectorAll("td").forEach(td => {
-        td.addEventListener("click", () => {
-            const atual = td.textContent.trim();
-            const indice = estados.indexOf(atual);
-            td.textContent = estados[(indice + 1) % estados.length];
-        });
+<div id="saida"></div>
+
+<script>
+
+const estados = ["", "X", "O"];
+
+document.querySelectorAll("td").forEach(td => {
+    td.onclick = () => {
+        const atual = td.textContent.trim();
+        const indice = estados.indexOf(atual);
+        td.textContent = estados[(indice + 1) % estados.length];
+    };
+});
+
+let session = pl.create();
+
+async function carregarBase() {
+
+    const resposta = await fetch("base-conhecimento.pl");
+    const codigo = await resposta.text();
+
+    session.consult(codigo, {
+        success: () => console.log("Base carregada."),
+        error: err => console.error(err)
     });
+
+}
+
+carregarBase();
+
+const consulta = document.getElementById("consulta");
+const botao = document.getElementById("executar");
+const saida = document.getElementById("saida");
+
+function mostrar(texto, classe) {
+    saida.innerHTML = `<span class="${classe}">${texto}</span>`;
+}
+
+function proximaResposta() {
+
+    session.answer({
+
+        success(answer) {
+            mostrar(session.format_answer(answer), "sucesso");
+        },
+
+        fail() {
+            mostrar("false.", "falha");
+        },
+
+        error(err) {
+            mostrar(err, "erro");
+        },
+
+        limit() {
+            mostrar("Limite atingido.", "erro");
+        }
+
+    });
+
+}
+
+function executarConsulta() {
+
+    const q = consulta.value.trim();
+
+    if (q === ";") {
+        proximaResposta();
+        return;
+    }
+
+    session.query(q, {
+
+        success() {
+            proximaResposta();
+        },
+
+        error(err) {
+            mostrar(err, "erro");
+        }
+
+    });
+
+}
+
+botao.onclick = executarConsulta;
+
+consulta.addEventListener("keydown", e => {
+
+    if (e.key === "Enter") {
+        executarConsulta();
+    }
+
+});
+
 </script>
 
 </body>
+
 </html>
