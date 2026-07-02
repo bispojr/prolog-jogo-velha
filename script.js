@@ -1,15 +1,8 @@
-const estados = ["", "X", "O"];
-
-document.querySelectorAll("td").forEach(td => {
-    td.onclick = () => {
-        const atual = td.textContent.trim();
-        const indice = estados.indexOf(atual);
-        td.textContent = estados[(indice + 1) % estados.length];
-    };
-});
-
 let session = pl.create();
 let baseCarregada = false;
+let consultaPendente = false;
+
+const celulas = Array.from(document.querySelectorAll("td[data-pos]"));
 
 const consulta = document.getElementById("consulta");
 const botao = document.getElementById("executar");
@@ -40,10 +33,18 @@ async function carregarBase() {
     }
 
     session.consult(codigo, {
-        success: () => {
+        success: async () => {
             baseCarregada = true;
             botao.disabled = false;
-            mostrar("Base carregada. Execute uma consulta.", "sucesso");
+
+            const init = await executarQueryUnica("inicializar.");
+            if (init.status === "error") {
+                mostrar(`Erro ao inicializar base: ${init.error}`, "erro");
+                return;
+            }
+
+            await sincronizarTabuleiro();
+            mostrar("Base carregada. Tabuleiro inicializado.", "sucesso");
             console.log("Base carregada.");
         },
         error: err => {
@@ -62,31 +63,139 @@ function mostrar(texto, classe) {
     saida.innerHTML = `<span class="${classe}">${texto}</span>`;
 }
 
-function proximaResposta() {
+function valorTabuleiroParaTexto(valor) {
+    if (valor === "x") {
+        return "X";
+    }
 
-    session.answer({
+    if (valor === "o") {
+        return "O";
+    }
 
-        success(answer) {
-            mostrar(session.format_answer(answer), "sucesso");
-        },
-
-        fail() {
-            mostrar("false.", "falha");
-        },
-
-        error(err) {
-            mostrar(err, "erro");
-        },
-
-        limit() {
-            mostrar("Limite atingido.", "erro");
-        }
-
-    });
-
+    return "";
 }
 
-function executarConsulta() {
+function extrairValorVariavel(formatado, variavel) {
+    const padrao = new RegExp(`${variavel}\\s*=\\s*([^,;]+)`);
+    const match = formatado.match(padrao);
+    return match ? match[1].trim() : null;
+}
+
+function executarQueryUnica(query) {
+    return new Promise(resolve => {
+        session.query(query, {
+            success() {
+                session.answer({
+                    success(answer) {
+                        const formatado = session.format_answer(answer);
+                        resolve({ status: "success", answer, formatado });
+                    },
+                    fail() {
+                        resolve({ status: "fail" });
+                    },
+                    error(err) {
+                        resolve({ status: "error", error: err });
+                    },
+                    limit() {
+                        resolve({ status: "limit" });
+                    }
+                });
+            },
+            error(err) {
+                resolve({ status: "error", error: err });
+            }
+        });
+    });
+}
+
+async function sincronizarTabuleiro() {
+    for (let pos = 1; pos <= 9; pos += 1) {
+        const resposta = await executarQueryUnica(`conteudo(${pos}, V).`);
+        if (resposta.status !== "success") {
+            celulas[pos - 1].textContent = "";
+            continue;
+        }
+
+        const valor = extrairValorVariavel(resposta.formatado, "V");
+        celulas[pos - 1].textContent = valorTabuleiroParaTexto(valor);
+    }
+}
+
+function consultaAlteraBase(query) {
+    return /\b(assertz|asserta|retractall|retract|abolish|jogar|inicializar|trocar_vez)\b/i.test(query);
+}
+
+async function jogarNoTabuleiro(pos) {
+    if (!baseCarregada || consultaPendente) {
+        return;
+    }
+
+    consultaPendente = true;
+    const resposta = await executarQueryUnica(`jogar(${pos}).`);
+
+    if (resposta.status === "success") {
+        await sincronizarTabuleiro();
+        mostrar(`Jogada aplicada na posicao ${pos}.`, "sucesso");
+    } else if (resposta.status === "fail") {
+        mostrar("Jogada invalida para a posicao selecionada.", "falha");
+    } else {
+        mostrar(`Erro ao jogar: ${resposta.error ?? "desconhecido"}`, "erro");
+    }
+
+    consultaPendente = false;
+}
+
+celulas.forEach(celula => {
+    celula.onclick = () => {
+        const pos = Number(celula.dataset.pos);
+        jogarNoTabuleiro(pos);
+    };
+});
+
+function proximaResposta() {
+    return new Promise(resolve => {
+        session.answer({
+
+            success(answer) {
+                const formatado = session.format_answer(answer);
+                mostrar(formatado, "sucesso");
+                resolve({ status: "success", formatado });
+            },
+
+            fail() {
+                mostrar("false.", "falha");
+                resolve({ status: "fail" });
+            },
+
+            error(err) {
+                mostrar(err, "erro");
+                resolve({ status: "error", error: err });
+            },
+
+            limit() {
+                mostrar("Limite atingido.", "erro");
+                resolve({ status: "limit" });
+            }
+
+        });
+    });
+}
+
+function executarConsultaInicial(query) {
+    return new Promise(resolve => {
+        session.query(query, {
+            success() {
+                proximaResposta().then(resolve);
+            },
+            error(err) {
+                mostrar(err, "erro");
+                resolve({ status: "error", error: err });
+            }
+        });
+    });
+}
+
+async function executarConsulta() {
 
     if (!baseCarregada) {
         mostrar("Aguarde: base Prolog ainda esta carregando.", "erro");
@@ -95,22 +204,26 @@ function executarConsulta() {
 
     const q = consulta.value.trim();
 
-    if (q === ";") {
-        proximaResposta();
+    if (q === "") {
+        mostrar("Digite uma consulta Prolog.", "erro");
         return;
     }
 
-    session.query(q, {
+    if (q === ";") {
+        await proximaResposta();
+        return;
+    }
 
-        success() {
-            proximaResposta();
-        },
+    consultaPendente = true;
 
-        error(err) {
-            mostrar(err, "erro");
-        }
+    const alteraBase = consultaAlteraBase(q);
+    const resposta = await executarConsultaInicial(q);
 
-    });
+    if (alteraBase && resposta.status !== "error") {
+        await sincronizarTabuleiro();
+    }
+
+    consultaPendente = false;
 
 }
 
