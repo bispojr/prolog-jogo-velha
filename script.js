@@ -9,24 +9,54 @@ document.querySelectorAll("td").forEach(td => {
 });
 
 let session = pl.create();
+let baseCarregada = false;
+
+const consulta = document.getElementById("consulta");
+const botao = document.getElementById("executar");
+const saida = document.getElementById("saida");
+
+botao.disabled = true;
 
 async function carregarBase() {
 
-    const resposta = await fetch("base-conhecimento.pl");
-    const codigo = await resposta.text();
+    mostrar("Carregando base Prolog...", "falha");
+
+    let codigo;
+
+    try {
+        const resposta = await fetch("base-conhecimento.pl");
+
+        if (!resposta.ok) {
+            throw new Error(`Falha HTTP ${resposta.status} ao carregar base-conhecimento.pl`);
+        }
+
+        codigo = await resposta.text();
+    } catch (err) {
+        baseCarregada = false;
+        botao.disabled = true;
+        mostrar(`Erro ao carregar arquivo da base: ${err}`, "erro");
+        console.error(err);
+        return;
+    }
 
     session.consult(codigo, {
-        success: () => console.log("Base carregada."),
-        error: err => console.error(err)
+        success: () => {
+            baseCarregada = true;
+            botao.disabled = false;
+            mostrar("Base carregada. Execute uma consulta.", "sucesso");
+            console.log("Base carregada.");
+        },
+        error: err => {
+            baseCarregada = false;
+            botao.disabled = true;
+            mostrar(`Erro ao compilar base Prolog: ${err}`, "erro");
+            console.error(err);
+        }
     });
 
 }
 
 carregarBase();
-
-const consulta = document.getElementById("consulta");
-const botao = document.getElementById("executar");
-const saida = document.getElementById("saida");
 
 function mostrar(texto, classe) {
     saida.innerHTML = `<span class="${classe}">${texto}</span>`;
@@ -57,6 +87,11 @@ function proximaResposta() {
 }
 
 function executarConsulta() {
+
+    if (!baseCarregada) {
+        mostrar("Aguarde: base Prolog ainda esta carregando.", "erro");
+        return;
+    }
 
     const q = consulta.value.trim();
 
