@@ -1,49 +1,70 @@
 # Jogo da Velha com Prolog (Tau Prolog)
 
-Projeto acadêmico simples que combina uma interface web com uma base de conhecimento em Prolog para representar regras do Jogo da Velha.
+Projeto acadêmico que integra interface web com lógica em Prolog executada no navegador via Tau Prolog.
 
-## Ideia do projeto
+## Visão geral
 
-A proposta é unir:
+O projeto combina:
 
-- **Camada visual (HTML/CSS):** tabuleiro 3x3 e área de consulta.
-- **Camada de interação (JavaScript):** leitura de entrada do usuário, envio de consultas e exibição de respostas.
-- **Camada lógica (Prolog):** regras do jogo (estado inicial, transições, vitória, empate, estado terminal e consultas auxiliares).
+- Interface HTML/CSS com tabuleiro 3x3 clicável.
+- JavaScript para carregar a base Prolog, enviar consultas e sincronizar o tabuleiro.
+- Base Prolog dinâmica para armazenar estado das casas e turno atual.
 
-Assim, o projeto permite experimentar lógica declarativa (Prolog) no navegador, sem backend dedicado.
+Não há backend: toda a execução acontece no browser.
 
-## Integrações
+## Como funciona hoje
 
-- **Tau Prolog via CDN** no `index.html`:
-  - `core.min.js`
-  - `lists.min.js`
-- **Carga dinâmica da base Prolog** (`base-conhecimento.pl`) com `fetch` no `script.js`.
-- **Sessão Prolog no browser** com `pl.create()`, usando:
-  - `session.consult(...)`
-  - `session.query(...)`
-  - `session.answer(...)`
+Ao abrir a página:
+
+1. O JavaScript carrega `base-conhecimento.pl` via `fetch`.
+2. A base é consultada na sessão Tau Prolog.
+3. A consulta `inicializar.` é executada automaticamente.
+4. O tabuleiro visual é sincronizado com os fatos Prolog (`conteudo/2`).
+
+Durante o uso:
+
+- Clique em uma célula para executar `jogar(Pos)`.
+- Use o campo de texto para enviar consultas Prolog livres.
+- Use `;` para obter a próxima resposta da consulta anterior.
+
+Se uma consulta alterar a base (por exemplo: `jogar/1`, `inicializar/0`, `trocar_vez/0`, `assertz/1`, `retract/1`, `retractall/1`, `abolish/1`), a interface sincroniza o tabuleiro novamente.
+
+## Predicados disponíveis na base (`base-conhecimento.pl`)
+
+- `inicializar/0`: limpa o estado e cria 9 casas vazias (`v`), com vez de `x`.
+- `proximo/2`: define alternância entre jogadores (`x` e `o`).
+- `jogar/1`: joga na posição informada se estiver vazia e troca a vez.
+- `trocar_vez/0`: alterna o jogador atual.
+- `conteudo/2`: retorna o valor de uma posição (`x`, `o` ou `v`).
+- `tabuleiro/1`: retorna lista com os valores das casas.
+- `linha/3`: combinações vencedoras.
+- `venceu/1`: verdadeiro quando um jogador preenche uma linha vencedora.
+
+Predicados dinâmicos usados como estado:
+
+- `casa/2`
+- `vez/1`
+
+## Estrutura do projeto
+
+- `index.html`: interface e importação das libs Tau Prolog.
+- `styles.css`: estilos da página.
+- `script.js`: integração com Tau Prolog e lógica da interface.
+- `base-conhecimento.pl`: base de conhecimento Prolog.
 
 ## Tecnologias
 
 - HTML5
 - CSS3
 - JavaScript (vanilla)
-- Prolog (base de conhecimento)
-- Tau Prolog (execução Prolog em JavaScript)
+- Prolog
+- Tau Prolog (CDN)
 
-## Estrutura
+## Requisitos
 
-- `index.html`: interface principal e importação das bibliotecas.
-- `styles.css`: estilos da página.
-- `script.js`: manipulação da interface e integração com Tau Prolog.
-- `base-conhecimento.pl`: regras e predicados do jogo.
+- Node.js (para subir servidor local com `npx serve`)
 
-## Pré-requisitos
-
-Para rodar com `npx serve`, você precisa ter **Node.js** instalado na máquina.
-Ao instalar Node.js, o `npm` é instalado junto e, nas versões modernas, o `npx` também.
-
-Verifique se já está disponível:
+Verifique:
 
 ```bash
 node -v
@@ -51,43 +72,31 @@ npm -v
 npx -v
 ```
 
-Se o `npx` não existir, instale/atualize o Node.js:
-
-- Opção recomendada (Linux/macOS): usar **nvm** para gerenciar versões.
-- Opção simples: instalar Node.js pelo site oficial: <https://nodejs.org/>
-
-Exemplo com nvm:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
-# reinicie o terminal
-nvm install --lts
-nvm use --lts
-```
-
-## Como rodar após clonar
+## Como executar
 
 1. Clone o repositório:
 
-   ```bash
-   git clone <URL_DO_REPOSITORIO>
-   cd prolog-jogo-velha
-   ```
+  ```bash
+  git clone <URL_DO_REPOSITORIO>
+  cd prolog-jogo-velha
+  ```
 
-2. Suba um servidor HTTP local (exemplo com `npx serve`):
+2. Suba um servidor HTTP local:
 
-   ```bash
-   npx serve
-   ```
+  ```bash
+  npx serve
+  ```
 
-3. Abra o endereço exibido no terminal (geralmente `http://localhost:3000`).
+3. Abra a URL informada no terminal (normalmente `http://localhost:3000`).
 
-> Observação: não abra o `index.html` diretamente via `file://`, pois o projeto usa `fetch` para carregar `base-conhecimento.pl`.
+Importante: não abra `index.html` via `file://`, porque o projeto depende de `fetch` para carregar a base Prolog.
 
-## Exemplos de consultas (na caixa de texto da página)
+## Consultas de exemplo
 
-- `jogador(x).`
-- `estado_inicial(E).`
-- `jogada_possivel(estado([v,v,v,v,v,v,v,v,v], x), Pos).`
+- `inicializar.`
+- `conteudo(5, V).`
+- `tabuleiro(L).`
+- `venceu(x).`
+- `vez(J).`
 
-Use `;` para pedir a próxima resposta de uma consulta com múltiplas soluções.
+Para consultas com múltiplas soluções, envie `;` para pedir a próxima resposta.
