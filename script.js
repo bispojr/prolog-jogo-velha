@@ -122,7 +122,7 @@ async function sincronizarTabuleiro() {
 }
 
 function consultaAlteraBase(query) {
-    return /\b(assertz|asserta|retractall|retract|abolish|jogar|inicializar|trocar_vez)\b/i.test(query);
+    return /\b(assertz|asserta|retractall|retract|abolish|jogar|inicializar|trocar_vez|bot_bobinho)\b/i.test(query);
 }
 
 async function jogarNoTabuleiro(pos) {
